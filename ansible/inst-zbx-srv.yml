@@ -1,0 +1,87 @@
+- hosts: "launched"
+  gather_facts: true
+
+  vars:
+    zbx_repo_path: https://repo.zabbix.com/zabbix/3.4/ubuntu/pool/main/z/zabbix-release/
+    zbx_repo_pckg: zabbix-release_3.4-1+bionic_all.deb
+    admin_users:
+    - username: "kivanov"
+      groups:   "sudo,{{ admin_group_name }}"
+      shell:    "/bin/bash"
+    - username: "kanoadmin"
+      groups:   "sudo,{{ admin_group_name }}"
+      shell:    "/bin/bash"
+
+  handlers:
+    - name: "Restart sshd"
+      service:
+        name: "sshd"
+        state: "restarted"
+
+  tasks:
+    - name: "download zabbix metapackage {{ zbx_repo_pckg }}"
+      get_url: 
+          url: "{{ zbx_repo_path }}{{ zbx_repo_pckg }}"
+          dest: /tmp
+          
+    - name: "install zabbix metapackage {{ zbx_repo_pckg }}"
+      become: true
+      apt: 
+        deb: "/tmp/{{ zbx_repo_pckg }}" 
+          
+    - name: "update apt cache"
+      become: true
+      apt:
+        update_cache: yes
+        cache_valid_time: 86400 #One day
+
+    - name: "install zabbix metapackage {{ zbx_repo_pckg }}"
+      become: true
+      apt:
+        pkg: "{{item}}"
+        state: installed
+      with_items:
+          - zabbix-server-mysql
+          - zabbix-frontend-php 
+          - zabbix-agent 
+
+    - name: "install zabbix packages"
+      become: true
+      apt:
+        pkg: "{{item}}"
+        state: installed
+      with_items:
+          - zabbix-server-mysql
+          - zabbix-frontend-php 
+          - zabbix-agent 
+
+
+    - name: "create mysql zabbix db"
+      become: true
+      mysql_db:
+        name: zabbix
+        state: present
+        encoding: utf8
+        collation: utf8_bin
+
+    - name: "create mysql zabbix user"
+      become: true
+      mysql_user:
+        name: zabbix
+        password: zabbix
+        priv: '*.*:ALL'
+        state: present
+
+
+
+
+#    - name: "Allow admin users to sudo without a password"
+#      lineinfile:
+#        dest: "/etc/sudoers" # path: in version 2.3
+#        state: "present"
+#        regexp: "^%admin"
+#        line: "%admin ALL=(ALL) NOPASSWD: ALL"
+
+
+# 2DO run Certbot
+

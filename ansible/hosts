@@ -1,5 +1,5 @@
-[all:vars]
-ansible_python_interpreter = /usr/bin/python3
+#[all:vars]
+#ansible_python_interpreter = /usr/bin/python3
 # на DO в образе Ubuntu1804 нет Python2.7
 # похоже, поэтому и не работает Ansible
 # TODO - поставить второй питон и проверить
@@ -11,9 +11,8 @@ localhost ansible_connection=local
 [bast_group]
 bast-host	ansible_port=22		ansible_host=u1804-bast		ansible_user=root 		ansible_ssh_private_key_file=~/.ssh/id_rsa
 
-
-#[isc_db]
-#sho-mdm01	ansible_port=22		ansible_host=10.20.30.113	ansible_user=mykola.ivanov	ansible_ssh_pass=8*****i
+[launched]
+104.248.132.97 ansible_host=104.248.132.97 ansible_user=root
 
 
 

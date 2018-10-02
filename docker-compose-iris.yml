@@ -1,0 +1,24 @@
+version: '2'
+
+services:
+  S_iris2:
+    image: docker.intersystems.com/intersystems/iris:2018.1.1.635.0
+    container_name: C_iris2
+    hostname: iris_dockered
+    environment:
+      - ICM_SENTINEL_DIR=/external             # place file change_password.done, path match --before
+      - ISC_DATA_DIRECTORY=/dur/iconfig        # where datadir in iris container
+
+    command: --key /external/iris.key --before "/usr/irissys/dev/Cloud/ICM/changePassword.sh /external/password.txt"
+    volumes:
+      - /home/kanoadmin/lic/shard.key:/external/iris.key:ro
+      - /home/kanoadmin/iris_ext2:/external:rw
+      - /home/kanoadmin/iris_ext2/dursys:/dur
+      - /home/kanoadmin/iris_ext2/appDBs:/appDBs
+    ports:
+      - 56778:51773
+      - 57778:52773
+#    restart: unless-stopped
+#######################################################################
+
+
