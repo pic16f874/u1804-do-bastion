@@ -7,8 +7,8 @@
             state: present
             command: ssh
             name: netbook
-            ssh_pub_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfQq8hduj0SmhiwWeKEA3GmafhITHmNsYe5ieF+YwC85V8BT9oSRIXeKcJJT2FPW1NiXifpM50zmee4fLQoJF/NWEen/SPzSea5jT6gS5rQq9fOLnJV9Al/A11DFhMF7Gc8XIdAnvzuwCITUMoH4PuAvI1/o4bMX9pnn75ldO1g2WbUAsPtg09AzQ3CDVSd0H8veALg+rru5nSAmnJmAOPkS6uXf7Mpc9W5zmZ0+T5rLZLpWCRZ9SrPvwbiaKVQim2z/F2q2XLQ2UGfGQuKzOVt7oXGPi81BymKUcwPtkiDzyAmzer6+YYSZJy8BpepFkVRSECxF4hltCjGKUUaCpn'
-            api_token: 0e8aa7f6bd35db089f3e1588c396da363bc59db024bff988687591e9ae990403
+            ssh_pub_key: "{{ sshpublickey }}"
+            api_token: "{{ doapitoken }}"
       register: my_key
 
 #    - debug:
@@ -21,7 +21,7 @@
             state: present
             command: droplet
             name: U1804-bastion
-            api_token: 0e8aa7f6bd35db089f3e1588c396da363bc59db024bff988687591e9ae990403
+            api_token: "{{ doapitoken }}"
             region_id: fra1
             ssh_key_ids: "{{ my_key.ssh_key.id }}"
             size_id: s-1vcpu-1gb
@@ -49,29 +49,6 @@
 
 - hosts: "launched"
   gather_facts: true
-
-  vars:
-    zbx_repo_path: https://repo.zabbix.com/zabbix/3.4/ubuntu/pool/main/z/zabbix-release/
-    zbx_repo_pckg: zabbix-release_3.4-1+bionic_all.deb
-
-    admin_group_name: "kanoadmins"
-
-    admin_users:
-    - username: "kivanov"
-      groups:   "sudo,{{ admin_group_name }}"
-      shell:    "/bin/bash"
-    - username: "kanoadmin"
-      groups:   "sudo,{{ admin_group_name }}"
-      shell:    "/bin/bash"
-
-    users:
-    - username: "ftp"
-      groups:   "ftp"
-#ubuntu
-      shell:    "/usr/sbin/nologin"
-#ami
-#      shell: /sbin/nologin
-#      groups: wheel,technics
 
   handlers:
     - name: "Restart sshd"
@@ -114,7 +91,7 @@
         user: "{{ item.username }}"
 #        key: "{{ lookup('file', 'files/'+ item + '.key.pub') }}"
 #        key: "{{ lookup('file', '/home/kivanov/.ssh/id_rsa.pub') }}"
-        key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfQq8hduj0SmhiwWeKEA3GmafhITHmNsYe5ieF+YwC85V8BT9oSRIXeKcJJT2FPW1NiXifpM50zmee4fLQoJF/NWEen/SPzSea5jT6gS5rQq9fOLnJV9Al/A11DFhMF7Gc8XIdAnvzuwCITUMoH4PuAvI1/o4bMX9pnn75ldO1g2WbUAsPtg09AzQ3CDVSd0H8veALg+rru5nSAmnJmAOPkS6uXf7Mpc9W5zmZ0+T5rLZLpWCRZ9SrPvwbiaKVQim2z/F2q2XLQ2UGfGQuKzOVt7oXGPi81BymKUcwPtkiDzyAmzer6+YYSZJy8BpepFkVRSECxF4hltCjGKUUaCpn"
+        key: "{{ sshpublickey }}"
       with_items: "{{ admin_users }}"
 
 #Now we are managing adding and removing users to the server we can improve security by disabling root logins via ssh. 
@@ -159,48 +136,49 @@
         update_cache: yes
         cache_valid_time: 86400 #One day
 
-    - name: "install zabbix metapackage {{ zbx_repo_pckg }}"
-      become: true
-      apt:
-        pkg: "{{item}}"
-        state: present
-      with_items:
-          - zabbix-server-mysql
-          - zabbix-frontend-php 
-          - zabbix-agent 
 
-    - name: "install zabbix packages"
-      become: true
-      apt:
-        pkg: "{{item}}"
-        state: present
-      with_items:
-          - zabbix-server-mysql
-          - zabbix-frontend-php 
-          - zabbix-agent 
-          - python-pip
+#    - name: "install zabbix packages {{ zbx_repo_pckg }}"
+#      become: true
+#      apt:
+#        pkg: "{{item}}"
+#        state: present
+#      with_items:
+#          - zabbix-server-mysql
+#          - zabbix-frontend-php 
+#          - zabbix-agent 
 
-    - name: "pip install MySQL-python module"
-      pip: 
-        name: "{{item}}"
-      with_items:
-          - MySQLdb
-          - PyMySQL
+#    - name: "install zabbix packages"
+#      become: true
+#      apt:
+#        pkg: "{{item}}"
+#        state: present
+#      with_items:
+#          - zabbix-server-mysql
+#          - zabbix-frontend-php 
+#          - zabbix-agent 
+#          - python-pip
 
-    - name: "create mysql zabbix db"
-      become: true
-      mysql_db:
-        name: zabbix
-        state: present
-        encoding: utf8
-        collation: utf8_bin
+#    - name: "pip install MySQL-python module"
+#      pip: 
+#        name: "{{item}}"
+#      with_items:
+#          - MySQLdb
+#          - PyMySQL
 
-    - name: "create mysql zabbix user"
-      become: true
-      mysql_user:
-        name: zabbix
-        password: zabbix
-        priv: '*.*:ALL'
-        state: present
+#    - name: "create mysql zabbix db"
+#      become: true
+#      mysql_db:
+#        name: zabbix
+#        state: present
+#        encoding: utf8
+#        collation: utf8_bin
+
+#    - name: "create mysql zabbix user"
+#      become: true
+#      mysql_user:
+#        name: zabbix
+#        password: zabbix
+#        priv: '*.*:ALL'
+#        state: present
 
 

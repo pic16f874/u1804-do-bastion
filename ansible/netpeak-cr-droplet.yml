@@ -1,0 +1,238 @@
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: add ssh key into digital-ocean 
+      digital_ocean:
+            state: present
+            command: ssh
+            name: netbook
+            ssh_pub_key: "{{ sshpublickey }}"
+            api_token: "{{ doapitoken }}"
+      register: my_key
+
+    - include_tasks: cr-droplet_inner.yml
+      loop:
+         - name: No1
+           sizeid: s-1vcpu-1gb
+#         - name: No2
+#           sizeid: s-1vcpu-1gb
+#         - name: No10
+#           sizeid: s-1vcpu-1gb
+      loop_control:
+         loop_var: droplet_item
+ 
+
+
+- hosts: "launched"
+  gather_facts: false
+
+  handlers:
+    - name: "Restart sshd"
+      service:
+        name: "sshd"
+        state: "restarted"
+
+  tasks:
+    - name: Ensure group kanoadmins exists
+      group:
+        name: "{{ admin_group_name }}"
+        state: present
+
+
+    - name: "Allow admin users to sudo without a password"
+      lineinfile:
+        dest: "/etc/sudoers.d/kanoadmins"
+        state: "present"
+        create: yes
+        insertbefore: BOF
+        line: "%{{ admin_group_name }} ALL=(ALL) NOPASSWD: ALL"
+        validate: '/usr/sbin/visudo -cf %s'
+
+    - name: Create user which have admin privileges
+      user:
+        name: "{{ item.username }}"
+        shell: "{{ item.shell }}"
+        groups: "{{ item.groups }}"  
+        append: yes
+      with_items: "{{ admin_users }}"
+
+    - name: "Add authorized keys"
+      authorized_key:
+        user: "{{ item.username }}"
+        key: "{{ sshpublickey }}"
+      with_items: "{{ admin_users }}"
+
+    - name: "Disable root login via SSH"
+      lineinfile:
+         dest: "/etc/ssh/sshd_config"
+         regexp: "^PermitRootLogin"
+         line: "PermitRootLogin no"
+      notify: "Restart sshd"
+
+
+    - name: "create the file to be used for swap" 
+#      command: fallocate -l 4G /mnt/4GBswap
+      command: dd if=/dev/zero of=/mnt/4GBswap bs=4096 count=1048576
+      become: yes
+    - name: format the file for swap
+      command: mkswap /mnt/4GBswap
+    - name: change swap file permissions
+      file: path=/mnt/4GBswap owner=root group=root mode=0600
+    - name: add the file to the system as a swap file
+      command: swapon /mnt/4GBswap
+    - name: write swap entry in fstab
+      mount: name=none src=/mnt/4GBswap fstype=swap opts=sw passno=0 dump=0 state=present
+
+
+
+##########################################################################################
+
+    - name: Install epel-release 
+      yum: name=epel-release state=installed
+
+    - name: Install python3 repo
+      yum: name=https://centos7.iuscommunity.org/ius-release.rpm state=present
+
+    - name: Install MySQL 5.6 repo
+      yum: name=http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm state=present
+#      yum: name=http://dev.mysql.com/get/mysql57-community-release-el7-8.noarch.rpm state=present
+#      yum: name=http://dev.mysql.com/get/mysql57-community-release-el7-5.noarch.rpm state=present
+
+    - name: Install MySQL 5.6
+      yum: pkg={{ item }}
+      with_items:
+        - mysql-community-server
+        - mysql-community-client
+        - MySQL-python
+#        - python-pip
+        - python2-PyMySQL
+#        - python36u
+#        - python36u-devel
+#        - python36u-pip
+#        - python3-PyMySQL
+
+#    - name: Install PyMySQL virtualenv
+#      pip: 
+#        name:
+#          - virtualenv   
+#          - PyMySQL
+#          - MySQLdb
+
+
+#https://gist.github.com/ihassin/8106956
+
+
+    - name: Start the MySQL service
+      service: name=mysqld state=started enabled=true
+
+    - name: update mysql root passwd
+      mysql_user: name=root
+         host={{ item }}
+          password='Password'
+          login_user=root
+          login_password=''
+          state=present
+          check_implicit_admin=yes
+      with_items:
+        - 127.0.0.1
+        - ::1
+        - localhost
+
+
+
+#    - name: change mysql pwd
+#      command: "mysql -uroot -e \"use mysql;update user set password=PASSWORD(\'pwd\') where User=\'root\';flush privileges;\" "
+#      become: yes
+ 
+##########################################################################################
+
+    - name: Add repository 'remi-repo' 
+#      command: rpm -ih http://rpms.famillecollet.com/enterprise/remi-release-7.rpm creates=/etc/yum.repos.d/remi.repo 
+      yum: name=http://rpms.famillecollet.com/enterprise/remi-release-7.rpm state=present
+
+    - name: install packages
+      yum: name={{ item }} enablerepo=epel,remi,remi-php71 state=installed 
+      with_items: 
+          - mc  
+          - nginx
+          - phpmyadmin
+          - redis
+          - php
+          - php-common
+          - php-opcache
+          - php-mcrypt
+          - php-cli 
+          - php-gd 
+          - php-curl
+          - php-mysql
+          - php-bcmath
+          - php-imagick
+          - php-pdo
+          - php-amqp
+          - php-fpm
+
+#https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-phpmyadmin-with-nginx-on-a-centos-7-server#prerequisites
+#https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-on-centos-7#prerequisites
+#https://linuxize.com/post/install-php-7-on-centos-7/
+
+    - name: copy php.conf to nginx /etc/nginx/default.d
+      copy:
+         src: php.conf
+         dest: /etc/nginx/default.d
+         owner: nginx
+         group: nginx
+         mode: 0644
+
+    - name: edit /etc/php-fpm.d/www.conf
+      lineinfile: 
+           dest: /etc/php-fpm.d/www.conf 
+           state: present 
+           regexp: "^;*user"
+           line: "user = nginx"           
+    - name: edit /etc/php-fpm.d/www.conf
+      lineinfile: 
+           dest: /etc/php-fpm.d/www.conf 
+           state: present 
+           regexp: "^;*group"
+           line: "group = nginx"           
+    - name: edit /etc/php-fpm.d/www.conf
+      lineinfile: 
+           dest: /etc/php-fpm.d/www.conf 
+           state: present 
+           regexp: "^;*listen = "
+           line: "listen = /run/php-fpm/www.sock"           
+    - name: edit /etc/php-fpm.d/www.conf
+      lineinfile: 
+           dest: /etc/php-fpm.d/www.conf 
+           state: present 
+           regexp: "^;*listen.owner"
+           line: "listen.owner = nginx"           
+    - name: edit /etc/php-fpm.d/www.conf
+      lineinfile: 
+           dest: /etc/php-fpm.d/www.conf 
+           state: present 
+           regexp: "^;*listen.group"
+           line: "listen.group = nginx"           
+
+
+    - name: "chown -R root:nginx    /var/lib/php"
+      file: 
+        path: /var/lib/php/
+        owner: root
+        group: nginx
+#        mode: 0775
+        recurse: yes
+
+    - name: "create phpMyAdmin symlink" 
+      command: ln -s /usr/share/phpMyAdmin /usr/share/nginx/html
+      become: yes
+
+    - name: Start the php-fpm service
+      service: name=php-fpm state=started enabled=true
+
+    - name: Start the nginx service
+      service: name=nginx state=started enabled=true
+
+    - name: Start the redis service
+      service: name=redis state=started enabled=true

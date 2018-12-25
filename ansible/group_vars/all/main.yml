@@ -1,0 +1,28 @@
+ts: "{{ lookup('pipe','date +%Y-%m-%d_%H-%M') }}"
+
+sshpublickey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfQq8hduj0SmhiwWeKEA3GmafhITHmNsYe5ieF+YwC85V8BT9oSRIXeKcJJT2FPW1NiXifpM50zmee4fLQoJF/NWEen/SPzSea5jT6gS5rQq9fOLnJV9Al/A11DFhMF7Gc8XIdAnvzuwCITUMoH4PuAvI1/o4bMX9pnn75ldO1g2WbUAsPtg09AzQ3CDVSd0H8veALg+rru5nSAmnJmAOPkS6uXf7Mpc9W5zmZ0+T5rLZLpWCRZ9SrPvwbiaKVQim2z/F2q2XLQ2UGfGQuKzOVt7oXGPi81BymKUcwPtkiDzyAmzer6+YYSZJy8BpepFkVRSECxF4hltCjGKUUaCpn"
+doapitoken: ""
+
+
+zbx_repo_path: https://repo.zabbix.com/zabbix/3.4/ubuntu/pool/main/z/zabbix-release/
+zbx_repo_pckg: zabbix-release_3.4-1+bionic_all.deb
+
+admin_group_name: "kanoadmins"
+
+admin_users:
+  - username: "kivanov"
+    groups:   "sudo,{{ admin_group_name }}"
+    shell:    "/bin/bash"
+  - username: "kanoadmin"
+    groups:   "sudo,{{ admin_group_name }}"
+    shell:    "/bin/bash"
+
+users:
+  - username: "ftp"
+    groups:   "ftp"
+#ubuntu
+    shell:    "/usr/sbin/nologin"
+#ami
+#      shell: /sbin/nologin
+#      groups: wheel,technics
+
