@@ -56,6 +56,19 @@
       service:
         name: "sshd"
         state: "restarted"
+    - name: "Restart apache2"
+      service:
+        name: "apache2"
+        state: "restarted"
+    - name: "Restart zabbix-server"
+      service:
+        name: "zabbix-server"
+        state: "restarted"
+    - name: "Restart zabbix-agent"
+      service:
+        name: "zabbix-agent"
+        state: "restarted"
+
 
   tasks:
     - name: Ensure group kanoadmins exists
@@ -119,6 +132,10 @@
 
 # 2DO run Certbot
 
+#zbx_repo_path: https://repo.zabbix.com/zabbix/4.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_4.0-2+bionic_all.deb
+#zbx_repo_pckg: zabbix-release_4.0-2+bionic_all.deb
+
+
     - name: "download zabbix metapackage {{ zbx_repo_pckg }}"
       get_url: 
           url: "{{ zbx_repo_path }}{{ zbx_repo_pckg }}"
@@ -145,29 +162,89 @@
           - zabbix-server-mysql
           - zabbix-frontend-php 
           - zabbix-agent 
+          - mc
+#          - git
+#          - ansible
 
-#    - name: "install zabbix packages"
-#      become: true
-#      apt:
-#        pkg: "{{item}}"
-#        state: present
-#      with_items:
-#          - zabbix-server-mysql
-#          - zabbix-frontend-php 
-#          - zabbix-agent 
-#          - python-pip
+    - name: edit /tmp/createmysqldb.sql
+      lineinfile: 
+           create: yes
+           dest: /tmp/createmysqldb.sql
+           state: present 
+           line: "{{ item.line }}"           
+      with_items: 
+#         - line: "drop database {{ zabbix_db_name }};"
+         - line: "create database {{ zabbix_db_name }} character set utf8 collate utf8_bin;"
+         - line: "grant all privileges on {{ zabbix_db_name }}.* to {{ zabbix_db_user }} identified by '{{ zabbix_db_pswd }}';"
 
-#    - name: "pip install MySQL-python module"
-#      pip: 
-#        name: "{{item}}"
-#      with_items:
-#          - MySQLdb
-#          - PyMySQL
+################################################################################
+## .digitalocean_password
+## root_mysql_pass="976f782ad1698fa2e3cc0f2048a320a1274454d02c6f46cf"
+## admin_mysql_pass="55d1819b9369907aec475c251c79332a3ec60b99a298fbff"
+## app_mysql_pass="18f5c96492b5ad4642b6d8e815657fa3a9ae681c4ef3255c"
+################################################################################
+    - name: "GET MySql password"
+      become: true
+      shell: "grep root_mysql_pass= /root/.digitalocean_password | cut -d= -f2"
+      register: mysqlrootpwd
+
+    - name: Print result of zabbix-db creation script
+      debug:
+        msg:
+          - "{{ mysqlrootpwd.stdout_lines[0] }}"
+
+    - name: "RUN zabbix-db creation script"
+      become: true
+      shell: "mysql -uroot -p{{ mysqlrootpwd.stdout_lines[0] }} < /tmp/createmysqldb.sql"
+      register: mysqlcrdb
+      
+    - name: Print result of RUN gitlab installation script
+      debug:
+        msg:
+          - "{{ mysqlcrdb }}"
+
+    - name: "IMPORT initial schema and data"
+      become: true
+      shell: "zcat /usr/share/doc/zabbix-server-mysql*/create.sql.gz | mysql -D{{ zabbix_db_name }} -u{{ zabbix_db_user }} -p{{ zabbix_db_pswd }}"
+      register: mysqlsch
+      
+    - name: Print result of IMPORT initial schema and data
+      debug:
+        msg:
+          - "{{ mysqlsch }}"
 
 
-##zabbix_db_name: zabbix
-##zabbix_db_user: zabbix
-##zabbix_db_pswd: zabbix
+
+    - name: edit /etc/zabbix/zabbix_server.conf
+      lineinfile: 
+           dest: /etc/zabbix/zabbix_server.conf
+           regexp: "{{ item.regexp }}"
+           line: "{{ item.line }}"           
+      with_items: 
+         - regexp: "^#? ?DBName="
+           line: "DBName={{ zabbix_db_name }}"
+         - regexp: "^#? ?DBUser="
+           line: "DBUser={{ zabbix_db_user }}"
+         - regexp: "^#? ?DBPassword="
+           line: "DBPassword={{ zabbix_db_pswd }}"
+
+#         - regexp: "^#? ?DBPassword="
+#           line: "DBPassword={{ zabbix_db_pswd }}"
+
+    - name: edit /etc/zabbix/apache.conf
+      lineinfile: 
+           dest: /etc/zabbix/apache.conf
+           regexp: "{{ item.regexp }}"
+           line: "{{ item.line }}"           
+      with_items: 
+         - regexp: "^#? ?php_value date.timezone"
+           line: "php_value date.timezone Europe/Kiev"
+      notify: 
+         - "Restart apache2"
+         - "Restart zabbix-agent"
+         - "Restart zabbix-server"
+
+
 
 
 
