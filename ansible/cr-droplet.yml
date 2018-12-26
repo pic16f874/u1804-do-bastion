@@ -27,8 +27,6 @@
             size_id: s-1vcpu-1gb
 #            image_id: Ubuntu-18-04-x64
             image_id: mysql-18-04
-#            size_id: s-1vcpu-3gb
-#            image_id: gitlab-18-04
             wait_timeout: 500
       register: my_droplet
 
@@ -41,6 +39,9 @@
          name: "{{ my_droplet.droplet.ip_address }}"
          groups: "launched"
          ansible_user: "root"
+         ansible_ssh_common_args: "-oStrictHostKeyChecking=no"
+         ansible_host_key_checking: False
+         ansible_python_interpreter: python3
 
     - name: Wait for SSH to come up
       local_action: wait_for host={{ my_droplet.droplet.ip_address }} port=22 delay=60 timeout=320 state=started           
@@ -89,8 +90,6 @@
     - name: "Add authorized keys"
       authorized_key:
         user: "{{ item.username }}"
-#        key: "{{ lookup('file', 'files/'+ item + '.key.pub') }}"
-#        key: "{{ lookup('file', '/home/kivanov/.ssh/id_rsa.pub') }}"
         key: "{{ sshpublickey }}"
       with_items: "{{ admin_users }}"
 
@@ -137,15 +136,15 @@
         cache_valid_time: 86400 #One day
 
 
-#    - name: "install zabbix packages {{ zbx_repo_pckg }}"
-#      become: true
-#      apt:
-#        pkg: "{{item}}"
-#        state: present
-#      with_items:
-#          - zabbix-server-mysql
-#          - zabbix-frontend-php 
-#          - zabbix-agent 
+    - name: "install zabbix packages {{ zbx_repo_pckg }}"
+      become: true
+      apt:
+        pkg: "{{item}}"
+        state: present
+      with_items:
+          - zabbix-server-mysql
+          - zabbix-frontend-php 
+          - zabbix-agent 
 
 #    - name: "install zabbix packages"
 #      become: true
@@ -164,6 +163,14 @@
 #      with_items:
 #          - MySQLdb
 #          - PyMySQL
+
+
+##zabbix_db_name: zabbix
+##zabbix_db_user: zabbix
+##zabbix_db_pswd: zabbix
+
+
+
 
 #    - name: "create mysql zabbix db"
 #      become: true
