@@ -274,6 +274,9 @@
 #        direction: in
 
 
+#TODO: creadte zabbix-action which perform auto-registration process 
+
+
 #    - name: "create mysql zabbix db"
 #      become: true
 #      mysql_db:
